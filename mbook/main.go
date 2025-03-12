@@ -2,13 +2,16 @@ package main
 
 import (
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"mbook/mbook/internal/reposotory"
-	"mbook/mbook/internal/reposotory/dao"
+	"mbook/mbook/internal/repository"
+	"mbook/mbook/internal/repository/dao"
 	"mbook/mbook/internal/service"
 	"mbook/mbook/internal/web"
+	"mbook/mbook/internal/web/middleware"
 	"strings"
 	"time"
 )
@@ -22,7 +25,7 @@ func main() {
 
 func initUserHdl(db *gorm.DB, server *gin.Engine) {
 	ud := dao.NewUserDao(db)
-	ur := reposotory.NewUserRepository(ud)
+	ur := repository.NewUserRepository(ud)
 	us := service.NewUserService(ur)
 	hdl := web.NewUserHandler(us)
 	hdl.RegisterRoutes(server)
@@ -40,6 +43,10 @@ func initDB() *gorm.DB {
 }
 
 func initWebServer() *gin.Engine {
+	store := cookie.NewStore([]byte("secret"))
+
+	loginMiddlewareBuilder := middleware.LoginMiddlewareBuilder{}
+
 	server := gin.Default()
 	server.Use(cors.New(cors.Config{
 		AllowCredentials: true,
@@ -49,6 +56,11 @@ func initWebServer() *gin.Engine {
 			return strings.HasPrefix(origin, "http://localhost")
 		},
 		MaxAge: 12 * time.Hour,
-	}))
+	}),
+		//第一个是把session弄出来，包括所有接口，如login接口
+		sessions.Sessions("ssid", store),
+		//第二个是利用session来做登录校验
+		loginMiddlewareBuilder.CheckLogin(),
+	)
 	return server
 }
