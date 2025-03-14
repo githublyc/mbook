@@ -45,6 +45,9 @@ func (m *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
+		if uc.UserAgent != ctx.GetHeader("user-agent") {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+		}
 		//其实valid就可以判断过期
 		expireTime := uc.ExpiresAt
 		//if expireTime.Before(time.Now()) {

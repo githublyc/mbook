@@ -140,7 +140,8 @@ func (h *UserHandler) LoginJWT(context *gin.Context) {
 	switch err {
 	case nil:
 		uc := UserClaims{
-			Uid: u.Id,
+			Uid:       u.Id,
+			UserAgent: context.GetHeader("User-Agent"),
 			RegisteredClaims: jwt.RegisteredClaims{
 				//30分钟过期
 				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
@@ -164,5 +165,6 @@ var JWTkey = []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgK")
 
 type UserClaims struct {
 	jwt.RegisteredClaims
-	Uid int64
+	Uid       int64
+	UserAgent string
 }

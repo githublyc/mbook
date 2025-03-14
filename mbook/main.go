@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"mbook/mbook/internal/repository"
@@ -10,6 +11,8 @@ import (
 	"mbook/mbook/internal/service"
 	"mbook/mbook/internal/web"
 	"mbook/mbook/internal/web/middleware"
+	"mbook/mbook/pkg/ginx/middleware/ratelimit"
+	"mbook/mbook/pkg/limiter"
 	"strings"
 	"time"
 )
@@ -54,6 +57,10 @@ func initWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}),
 	)
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	server.Use(ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 1000)).Build())
 	useJWT(server)
 	return server
 }
