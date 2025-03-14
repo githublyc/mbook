@@ -4,9 +4,11 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"mbook/mbook/internal/domain"
 	"mbook/mbook/internal/service"
 	"net/http"
+	"time"
 )
 
 const (
@@ -34,7 +36,8 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//分组路由
 	ug := server.Group("/users")
 	ug.POST("/signup", h.SignUp)
-	ug.POST("/login", h.Login)
+	//ug.POST("/login", h.Login)
+	ug.POST("/login", h.LoginJWT)
 	ug.POST("/edit", h.Edit)
 	ug.GET("/profile", h.Profile)
 }
@@ -122,4 +125,44 @@ func (h *UserHandler) Edit(context *gin.Context) {
 
 func (h *UserHandler) Profile(context *gin.Context) {
 
+}
+
+func (h *UserHandler) LoginJWT(context *gin.Context) {
+	type LoginReq struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req LoginReq
+	if err := context.Bind(&req); err != nil {
+		return
+	}
+	u, err := h.svc.Login(context, req.Email, req.Password)
+	switch err {
+	case nil:
+		uc := UserClaims{
+			Uid: u.Id,
+			RegisteredClaims: jwt.RegisteredClaims{
+				//30分钟过期
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 30)),
+			},
+		}
+		token := jwt.NewWithClaims(jwt.SigningMethodHS512, uc)
+		tokenStr, err := token.SignedString(JWTkey)
+		if err != nil {
+			context.String(http.StatusOK, "系统错误")
+		}
+		context.Header("x-jwt-token", tokenStr)
+		context.String(http.StatusOK, "登陆成功")
+	case service.ErrInvalidUserOrPassword:
+		context.String(http.StatusOK, "用户名或密码不对")
+	default:
+		context.String(http.StatusOK, "系统错误")
+	}
+}
+
+var JWTkey = []byte("k6CswdUm77WKcbM68UQUuxVsHSpTCwgK")
+
+type UserClaims struct {
+	jwt.RegisteredClaims
+	Uid int64
 }

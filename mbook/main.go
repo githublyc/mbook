@@ -2,8 +2,6 @@ package main
 
 import (
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -43,24 +41,36 @@ func initDB() *gorm.DB {
 }
 
 func initWebServer() *gin.Engine {
-	store := cookie.NewStore([]byte("secret"))
-
-	loginMiddlewareBuilder := middleware.LoginMiddlewareBuilder{}
 
 	server := gin.Default()
 	server.Use(cors.New(cors.Config{
 		AllowCredentials: true,
 
-		AllowHeaders: []string{"Content-Type"},
+		AllowHeaders:  []string{"Content-Type", "Authorization"},
+		ExposeHeaders: []string{"x-jwt-token"},
 		AllowOriginFunc: func(origin string) bool {
 			return strings.HasPrefix(origin, "http://localhost")
 		},
 		MaxAge: 12 * time.Hour,
 	}),
-		//第一个是把session弄出来，包括所有接口，如login接口
-		sessions.Sessions("ssid", store),
-		//第二个是利用session来做登录校验
-		loginMiddlewareBuilder.CheckLogin(),
 	)
+	useJWT(server)
 	return server
+}
+func useJWT(server *gin.Engine) {
+	loginJWTMiddlewareBuilder := middleware.LoginJWTMiddlewareBuilder{}
+	server.Use(loginJWTMiddlewareBuilder.CheckLogin())
+
+}
+func useSession(server *gin.Engine) {
+	//存储数据的，也就是userId存哪里
+	//直接存cookie
+	//store := cookie.NewStore([]byte("secret"))
+	//基于redis的实现
+	//store, _ := redis.NewStore(16, "tcp", "localhost:6379", "", []byte(""))
+	//loginMiddlewareBuilder := middleware.LoginMiddlewareBuilder{}
+	//第一个是把session弄出来，包括所有接口，如login接口
+	//第二个是利用session来做登录校验
+	//server.Use(sessions.Sessions("ssid", store),loginMiddlewareBuilder.CheckLogin())
+
 }
