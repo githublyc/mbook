@@ -21,11 +21,11 @@ const (
 type UserHandler struct {
 	emailRegexp    *regexp.Regexp
 	passwordRegexp *regexp.Regexp
-	svc            *service.UserService
-	codeSvc        *service.CodeService
+	svc            service.UserService
+	codeSvc        service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService, codeSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRegexp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexp: regexp.MustCompile(passwordRegexPattern, regexp.None),
