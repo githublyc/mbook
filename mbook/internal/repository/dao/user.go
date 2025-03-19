@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
@@ -40,12 +41,39 @@ func (dao *UserDao) FindByEmail(ctx context.Context, email string) (User, error)
 	return u, err
 }
 
+func (dao *UserDao) UpdateById(ctx context.Context, entity User) error {
+	return dao.db.WithContext(ctx).Model(&entity).Where("id = ?", entity.Id).
+		Updates(map[string]any{
+			"utime":    time.Now().UnixMilli(),
+			"nickname": entity.Nickname,
+			"birthday": entity.Birthday,
+			"about_me": entity.AboutMe,
+		}).Error
+}
+
+func (dao *UserDao) FindById(ctx context.Context, uid int64) (User, error) {
+	var res User
+	err := dao.db.WithContext(ctx).Where("id = ?", uid).First(&res).Error
+	return res, err
+}
+
+func (dao *UserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+	var res User
+	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&res).Error
+	return res, err
+}
+
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id int64 `gorm:"primaryKey,autoIncrement"`
+	//代表这是一个可以为null的列
+	Email    sql.NullString `gorm:"unique"`
 	Password string
 	// 创建时间
 	Ctime int64
 	// 更新时间
-	Utime int64
+	Utime    int64
+	Phone    sql.NullString `gorm:"unique"`
+	Birthday int64
+	AboutMe  string `gorm:"type=varchar(4096)"`
+	Nickname string `gorm:"type=varchar(128)"`
 }

@@ -6,33 +6,44 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"mbook/mbook/config"
 	"mbook/mbook/internal/repository"
+	"mbook/mbook/internal/repository/cache"
 	"mbook/mbook/internal/repository/dao"
 	"mbook/mbook/internal/service"
 	"mbook/mbook/internal/web"
 	"mbook/mbook/internal/web/middleware"
-	"mbook/mbook/pkg/ginx/middleware/ratelimit"
-	"mbook/mbook/pkg/limiter"
 	"strings"
 	"time"
 )
 
 func main() {
 	db := initDB()
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: config.Config.Redis.Addr,
+	})
 	server := initWebServer()
-	initUserHdl(db, server)
+	codeSvc := initCodeSvc(redisClient)
+	initUserHdl(db, redisClient, codeSvc, server)
 	server.Run(":8080")
 }
 
-func initUserHdl(db *gorm.DB, server *gin.Engine) {
+func initUserHdl(db *gorm.DB, redisClient redis.Cmdable,
+	codeSvc *service.CodeService, server *gin.Engine) {
 	ud := dao.NewUserDao(db)
-	ur := repository.NewUserRepository(ud)
+	uc := cache.NewUserCache(redisClient)
+	ur := repository.NewUserRepository(ud, uc)
 	us := service.NewUserService(ur)
-	hdl := web.NewUserHandler(us)
+	hdl := web.NewUserHandler(us, codeSvc)
 	hdl.RegisterRoutes(server)
 }
+func initCodeSvc(redisClient redis.Cmdable) *service.CodeService {
+	cc := cache.NewCodeCache(redisClient)
+	cr := repository.NewCodeRepository(cc)
+	return service.NewCodeService(cr, nil)
+}
 func initDB() *gorm.DB {
-	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:13316)/webook"))
+	db, err := gorm.Open(mysql.Open(config.Config.DB.DSN))
 	if err != nil {
 		panic(err)
 	}
@@ -57,10 +68,10 @@ func initWebServer() *gin.Engine {
 		MaxAge: 12 * time.Hour,
 	}),
 	)
-	redisClient := redis.NewClient(&redis.Options{
-		Addr: "localhost:6379",
-	})
-	server.Use(ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 1000)).Build())
+	//redisClient := redis.NewClient(&redis.Options{
+	//	Addr: config.Config.Redis.Addr,
+	//})
+	//server.Use(ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(redisClient, time.Second, 1000)).Build())
 	useJWT(server)
 	return server
 }

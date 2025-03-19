@@ -8,7 +8,11 @@ import (
 var ErrCodeVerifyTooMany = cache.ErrCodeVerifyTooMany
 
 type CodeRepository struct {
-	cache cache.CodeCache
+	cache *cache.CodeCache
+}
+
+func NewCodeRepository(cache *cache.CodeCache) *CodeRepository {
+	return &CodeRepository{cache: cache}
 }
 
 func (repo *CodeRepository) Set(ctx context.Context, biz, phone, code string) error {
