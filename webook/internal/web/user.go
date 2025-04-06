@@ -4,6 +4,7 @@ import (
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/service"
@@ -28,6 +29,7 @@ type UserHandler struct {
 
 func NewUserHandler(svc service.UserService, codeSvc service.CodeService) *UserHandler {
 	return &UserHandler{
+		jwtHandler:     newJwtHandler(),
 		emailRegexp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRegexp: regexp.MustCompile(passwordRegexPattern, regexp.None),
 		svc:            svc,
@@ -44,6 +46,7 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", h.LoginJWT)
 	ug.POST("/edit", h.Edit)
 	ug.GET("/profile", h.Profile)
+	ug.GET("/refresh_token", h.RefreshToken)
 	// 手机验证码登录相关功能
 	ug.POST("/login_sms/code/send", h.SendSMSLoginCode)
 	ug.POST("/login_sms", h.LoginSMS)
@@ -206,6 +209,11 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	u, err := h.svc.Login(ctx, req.Email, req.Password)
 	switch err {
 	case nil:
+		err := h.setRefreshToken(ctx, u.Id)
+		if err != nil {
+			ctx.String(http.StatusOK, "系统错误")
+			return
+		}
 		h.setJWTToken(ctx, u.Id)
 	case service.ErrInvalidUserOrPassword:
 		ctx.String(http.StatusOK, "用户名或密码不对")
@@ -283,8 +291,34 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 		})
 		return
 	}
+	err = h.setRefreshToken(ctx, u.Id)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
 	h.setJWTToken(ctx, u.Id)
 	ctx.JSON(http.StatusOK, Result{
 		Msg: "登录成功",
+	})
+}
+
+func (h *UserHandler) RefreshToken(ctx *gin.Context) {
+	tokenStr := ExtractToken(ctx)
+	var rc RefreshClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &rc,
+		func(token *jwt.Token) (interface{}, error) {
+			return h.refreshKey, nil
+		})
+	if err != nil {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	if token == nil || !token.Valid {
+		ctx.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	h.setJWTToken(ctx, rc.Uid)
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
 	})
 }
