@@ -3,11 +3,19 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"mbook/webook/internal/web"
+	ijwt "mbook/webook/internal/web/jwt"
 	"net/http"
 )
 
-type LoginJWTMiddlewareBuilder struct{}
+type LoginJWTMiddlewareBuilder struct {
+	ijwt.Handler
+}
+
+func NewLoginJWTMiddlewareBuilder(hdl ijwt.Handler) *LoginJWTMiddlewareBuilder {
+	return &LoginJWTMiddlewareBuilder{
+		Handler: hdl,
+	}
+}
 
 func (m *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -20,10 +28,10 @@ func (m *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 			path == "/oauth2/wechat/callback" {
 			return
 		}
-		tokenStr := web.ExtractToken(ctx)
-		var uc web.UserClaims
+		tokenStr := m.ExtractToken(ctx)
+		var uc ijwt.UserClaims
 		token, err := jwt.ParseWithClaims(tokenStr, &uc, func(token *jwt.Token) (interface{}, error) {
-			return web.JWTkey, nil
+			return ijwt.JWTKey, nil
 		})
 		if err != nil {
 			//token 不对
@@ -46,11 +54,24 @@ func (m *LoginJWTMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 		//}
 		//if expireTime.Sub(time.Now()) < time.Minute*29 {
 		//	uc.ExpiresAt = jwt.NewNumericDate(time.Now().Add(time.Minute * 30))
-		//	tokenStr, err = token.SignedString(web.JWTkey)
+		//	tokenStr, err = token.SignedString(web.JWTKey)
 		//	ctx.Header("x-jwt-token", tokenStr)
 		//	if err != nil {
 		//		log.Println(err)
 		//	}
+		//}
+		err = m.CheckSession(ctx, uc.Ssid)
+		if err != nil {
+			// token 无效或者 redis 有问题
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		// 可以兼容 Redis 异常的情况
+		// 做好监控，监控有没有 error
+		//if cnt > 0 {
+		//	// token 无效或者 redis 有问题
+		//	ctx.AbortWithStatus(http.StatusUnauthorized)
+		//	return
 		//}
 		ctx.Set("user", uc)
 	}

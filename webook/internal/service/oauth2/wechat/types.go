@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mbook/webook/internal/domain"
+	"mbook/webook/pkg/logger"
 	"net/http"
 	"net/url"
 )
@@ -20,9 +21,10 @@ type service struct {
 	appID     string
 	appSecret string
 	client    *http.Client
+	l         logger.LoggerV1
 }
 
-func NewService(appID string, appSecret string) Service {
+func NewService(appID string, appSecret string, l logger.LoggerV1) Service {
 	return &service{
 		appID:     appID,
 		appSecret: appSecret,

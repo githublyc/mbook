@@ -1,13 +1,16 @@
 package ioc
 
 import (
+	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 	"mbook/webook/internal/web"
+	ijwt "mbook/webook/internal/web/jwt"
 	"mbook/webook/internal/web/middleware"
 	"mbook/webook/pkg/ginx/middleware/ratelimit"
 	"mbook/webook/pkg/limiter"
+	"mbook/webook/pkg/logger"
 	"strings"
 	"time"
 )
@@ -20,8 +23,14 @@ func InitWebServer(mdls []gin.HandlerFunc,
 	wechatHdl.RegisterRoutes(server)
 	return server
 }
-func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
-	loginJWTMiddlewareBuilder := middleware.LoginJWTMiddlewareBuilder{}
+func InitGinMiddlewares(redisClient redis.Cmdable,
+	hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
+	loginJWTMiddlewareBuilder := middleware.NewLoginJWTMiddlewareBuilder(hdl)
+
+	logMiddlewareBuilder := middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
+		l.Debug("", logger.Field{"req", al})
+	}).AllowReqBody().AllowRespBody()
+
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowCredentials: true,
@@ -36,6 +45,7 @@ func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 		}),
 		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(
 			redisClient, time.Second, 1000)).Build(),
+		logMiddlewareBuilder.Build(),
 		loginJWTMiddlewareBuilder.CheckLogin(),
 	}
 }
