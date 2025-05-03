@@ -54,3 +54,17 @@ func (mr *MockArticleReaderDAOMockRecorder) Upsert(ctx, art any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Upsert", reflect.TypeOf((*MockArticleReaderDAO)(nil).Upsert), ctx, art)
 }
+
+// UpsertV2 mocks base method.
+func (m *MockArticleReaderDAO) UpsertV2(ctx context.Context, art dao.PublishedArticle) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertV2", ctx, art)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertV2 indicates an expected call of UpsertV2.
+func (mr *MockArticleReaderDAOMockRecorder) UpsertV2(ctx, art any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertV2", reflect.TypeOf((*MockArticleReaderDAO)(nil).UpsertV2), ctx, art)
+}
