@@ -36,7 +36,8 @@ func InitWebServer() *gin.Engine {
 	codeService := service.NewCodeService(codeRepository, smsService)
 	userHandler := web.NewUserHandler(handler, userService, codeService)
 	articleDAO := dao.NewArticleGORMDAO(db)
-	articleRepository := repository.NewCachedArticleRepository(articleDAO)
+	articleCache := cache.NewArticleRedisCache(cmdable)
+	articleRepository := repository.NewCachedArticleRepository(articleDAO, articleCache, userRepository)
 	articleService := service.NewArticleService(articleRepository)
 	articleHandler := web.NewArticleHandler(loggerV1, articleService)
 	wechatService := InitWechatService(loggerV1)
@@ -45,11 +46,15 @@ func InitWebServer() *gin.Engine {
 	return engine
 }
 
-func InitArticleHandler() *web.ArticleHandler {
+func InitArticleHandler(dao2 dao.ArticleDAO) *web.ArticleHandler {
 	loggerV1 := InitLogger()
+	cmdable := InitRedis()
+	articleCache := cache.NewArticleRedisCache(cmdable)
 	db := InitDB()
-	articleDAO := dao.NewArticleGORMDAO(db)
-	articleRepository := repository.NewCachedArticleRepository(articleDAO)
+	userDAO := dao.NewUserDAO(db)
+	userCache := cache.NewUserCache(cmdable)
+	userRepository := repository.NewCachedUserRepository(userDAO, userCache)
+	articleRepository := repository.NewCachedArticleRepository(dao2, articleCache, userRepository)
 	articleService := service.NewArticleService(articleRepository)
 	articleHandler := web.NewArticleHandler(loggerV1, articleService)
 	return articleHandler
@@ -62,3 +67,5 @@ var thirdPartySet = wire.NewSet(
 	InitRedis, InitDB,
 	InitLogger,
 )
+
+var userSvcProvider = wire.NewSet(dao.NewUserDAO, cache.NewUserCache, repository.NewCachedUserRepository, service.NewUserService)

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"mbook/webook/internal/domain"
 	"time"
 )
 
@@ -13,19 +12,45 @@ type ArticleDAO interface {
 	Insert(ctx context.Context, art Article) (int64, error)
 	UpdateById(ctx context.Context, art Article) error
 	Sync(ctx context.Context, art Article) (int64, error)
-	SyncStatus(ctx context.Context, uid int64, id int64, status domain.ArticleStatus) error
+	SyncStatus(ctx context.Context, uid int64, id int64, status uint8) error
+	GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]Article, error)
+	GetById(ctx context.Context, id int64) (Article, error)
+	GetPubById(ctx context.Context, id int64) (PublishedArticle, error)
 }
 
 type ArticleGORMDAO struct {
 	db *gorm.DB
 }
 
-func (a *ArticleGORMDAO) SyncStatus(ctx context.Context, uid int64, id int64, status domain.ArticleStatus) error {
+func (a *ArticleGORMDAO) GetPubById(ctx context.Context, id int64) (PublishedArticle, error) {
+	var res PublishedArticle
+	err := a.db.WithContext(ctx).
+		Where("id = ?", id).First(&res).Error
+	return res, err
+}
+
+func (a *ArticleGORMDAO) GetById(ctx context.Context, id int64) (Article, error) {
+	var art Article
+	err := a.db.WithContext(ctx).
+		Where("id=?", id).First(&art).Error
+	return art, err
+}
+
+func (a *ArticleGORMDAO) GetByAuthor(ctx context.Context, uid int64,
+	offset int, limit int) ([]Article, error) {
+	var arts []Article
+	err := a.db.WithContext(ctx).Where("author_id = ?", uid).
+		Offset(offset).Limit(limit).
+		Order("utime DESC").Find(&arts).Error
+	return arts, err
+}
+
+func (a *ArticleGORMDAO) SyncStatus(ctx context.Context, uid int64, id int64, status uint8) error {
 	now := time.Now().UnixMilli()
 	return a.db.WithContext(ctx).
 		Transaction(func(tx *gorm.DB) error {
 			res := tx.Model(&Article{}).
-				Where("id = ? and author_id = ?", uid, id).
+				Where("id = ? and author_id = ?", id, uid).
 				Updates(map[string]any{
 					"utime":  now,
 					"status": status,
@@ -37,7 +62,7 @@ func (a *ArticleGORMDAO) SyncStatus(ctx context.Context, uid int64, id int64, st
 				return errors.New("失败。ID不对或者作者不对")
 			}
 			return tx.Model(&PublishedArticle{}).
-				Where("id = ?", uid).
+				Where("id = ?", id).
 				Updates(map[string]any{
 					"utime":  now,
 					"status": status,
@@ -76,6 +101,7 @@ func (a *ArticleGORMDAO) Sync(ctx context.Context, art Article) (int64, error) {
 					"title":   pubArt.Title,
 					"content": pubArt.Content,
 					"utime":   pubArt.Utime,
+					"status":  pubArt.Status,
 				}),
 			}).Create(&pubArt).Error
 			return err
@@ -162,12 +188,12 @@ func (a *ArticleGORMDAO) Insert(ctx context.Context, art Article) (int64, error)
 }
 
 type Article struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Title    string `gorm:"type=varchar(4096)"`
-	Content  string `gorm:"type=BLOB"`
-	AuthorId int64  `gorm:"index"`
-	Status   uint8
-	Ctime    int64
-	Utime    int64
+	Id       int64  `gorm:"primaryKey,autoIncrement" bson:"id,omitempty"`
+	Title    string `gorm:"type=varchar(4096)" bson:"title,omitempty"`
+	Content  string `gorm:"type=BLOB" bson:"content,omitempty"`
+	AuthorId int64  `gorm:"index" bson:"author_id,omitempty"`
+	Status   uint8  `bson:"status,omitempty"`
+	Ctime    int64  `bson:"ctime,omitempty"`
+	Utime    int64  `bson:"utime,omitempty"`
 }
 type PublishedArticle Article
