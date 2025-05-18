@@ -14,11 +14,20 @@ import (
 	"mbook/webook/ioc"
 )
 
+var interactiveSvcSet = wire.NewSet(
+	dao.NewGORMInteractiveDAO,
+	cache.NewInteractiveRedisCache,
+	repository.NewCachedInteractiveRepository,
+	service.NewInteractiveService,
+)
+
 func InitWebServer() *gin.Engine {
 	wire.Build(
 		//第三方依赖
 		ioc.InitRedis, ioc.InitDB,
 		ioc.InitLogger,
+
+		interactiveSvcSet,
 
 		dao.NewUserDAO,
 		dao.NewArticleGORMDAO,

@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
 	"mbook/webook/internal/domain"
@@ -13,13 +14,20 @@ import (
 )
 
 type ArticleHandler struct {
-	svc service.ArticleService
-	l   logger.LoggerV1
+	svc     service.ArticleService
+	intrSvc service.InteractiveService
+	l       logger.LoggerV1
+	biz     string
 }
 
 func NewArticleHandler(l logger.LoggerV1,
-	svc service.ArticleService) *ArticleHandler {
-	return &ArticleHandler{l: l, svc: svc}
+	svc service.ArticleService, intrSvc service.InteractiveService) *ArticleHandler {
+	return &ArticleHandler{
+		l:       l,
+		svc:     svc,
+		intrSvc: intrSvc,
+		biz:     "article",
+	}
 }
 
 func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
@@ -33,7 +41,9 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 
 	pub := g.Group("/pub")
 	pub.GET("/:id", h.PubDetail)
-
+	// 传入一个参数，true 就是点赞, false 就是不点赞
+	pub.POST("/like", h.Like)
+	pub.POST("/collect", h.Collect)
 }
 
 func (h *ArticleHandler) Edit(ctx *gin.Context) {
@@ -243,6 +253,20 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
+
+	go func() {
+		//1. 如果你想摆脱原本主链路的超时控制，你就创建一个新的
+		//2. 如果你不想，你就用 ctx
+		newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		er := h.intrSvc.IncrReadCnt(newCtx, h.biz, art.Id)
+		if er != nil {
+			h.l.Error("更新阅读数失败",
+				logger.Int64("aid", art.Id),
+				logger.Error(err))
+		}
+	}()
+
 	vo := ArticleVo{
 		Id:    art.Id,
 		Title: art.Title,
@@ -255,4 +279,63 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		Utime:      art.Utime.Format(time.DateTime),
 	}
 	ctx.JSON(http.StatusOK, Result{Data: vo})
+}
+
+func (h *ArticleHandler) Like(ctx *gin.Context) {
+	type Req struct {
+		Id int64 `json:"id"`
+		// true 是点赞，false 是不点赞
+		Like bool `json:"like"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	var err error
+	if req.Like {
+		err = h.intrSvc.Like(ctx, h.biz, req.Id, uc.Uid)
+	} else {
+		err = h.intrSvc.CancelLike(ctx, h.biz, req.Id, uc.Uid)
+	}
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5, Msg: "系统错误",
+		})
+		h.l.Error("点赞/取消点赞失败",
+			logger.Error(err),
+			logger.Int64("uid", uc.Uid),
+			logger.Int64("aid", req.Id))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
+	})
+
+}
+
+func (h *ArticleHandler) Collect(ctx *gin.Context) {
+	type Req struct {
+		Id  int64 `json:"id"`
+		Cid int64 `json:"cid"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	err := h.intrSvc.Collect(ctx, h.biz, req.Id, req.Cid, uc.Uid)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5, Msg: "系统错误",
+		})
+		h.l.Error("收藏失败",
+			logger.Error(err),
+			logger.Int64("uid", uc.Uid),
+			logger.Int64("aid", req.Id))
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "OK",
+	})
 }

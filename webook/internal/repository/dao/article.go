@@ -91,6 +91,7 @@ func (a *ArticleGORMDAO) Sync(ctx context.Context, art Article) (int64, error) {
 			pubArt := PublishedArticle(art)
 			pubArt.Ctime = now
 			pubArt.Utime = now
+			//UpSert
 			err = tx.Clauses(clause.OnConflict{
 				// 对MySQL不起效，但是可以兼容别的方言
 				// INSERT xxx ON DUPLICATE KEY SET `title`=?
