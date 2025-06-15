@@ -1,0 +1,39 @@
+package ioc
+
+import (
+	"github.com/IBM/sarama"
+	"github.com/spf13/viper"
+	"mbook/webook/events"
+	"mbook/webook/events/article"
+)
+
+// InitSaramaClient client包括addr和sarama的config
+func InitSaramaClient() sarama.Client {
+	type Config struct {
+		Addr []string `yaml:"addr"`
+	}
+	var cfg Config
+	err := viper.UnmarshalKey("kafka", &cfg)
+	if err != nil {
+		panic(err)
+	}
+	scfg := sarama.NewConfig()
+	scfg.Producer.Return.Successes = true
+	client, err := sarama.NewClient(cfg.Addr, scfg)
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
+func InitSyncProducer(client sarama.Client) sarama.SyncProducer {
+	p, err := sarama.NewSyncProducerFromClient(client)
+	if err != nil {
+		panic(err)
+	}
+	return p
+}
+func InitConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
+	return []events.Consumer{
+		c1,
+	}
+}

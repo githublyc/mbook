@@ -9,12 +9,46 @@ import (
 
 type InteractiveDAO interface {
 	IncrReadCnt(ctx context.Context, biz string, bizId int64) error
+	// BatchIncrReadCnt biz和bizId 长度必须一致
+	BatchIncrReadCnt(ctx context.Context, biz []string, bizId []int64) error
 	InsertLikeInfo(ctx context.Context, biz string, id int64, uid int64) error
 	DeleteLikeInfo(ctx context.Context, biz string, id int64, uid int64) error
 	InsertCollectionBiz(ctx context.Context, cb UserCollectionBiz) error
+	GetLikeInfo(ctx context.Context, biz string, id int64, uid int64) (UserLikeBiz, error)
+	GetCollectInfo(ctx context.Context, biz string, id int64, uid int64) (UserCollectionBiz, error)
+	Get(ctx context.Context, biz string, id int64) (Interactive, error)
 }
 type GORMInteractiveDAO struct {
 	db *gorm.DB
+}
+
+func (dao *GORMInteractiveDAO) Get(ctx context.Context,
+	biz string, id int64) (Interactive, error) {
+	var res Interactive
+	err := dao.db.WithContext(ctx).
+		Where("biz = ? AND biz_id = ?", biz, id).
+		First(&res).Error
+	return res, err
+}
+
+func (dao *GORMInteractiveDAO) GetCollectInfo(ctx context.Context,
+	biz string, id int64, uid int64) (UserCollectionBiz, error) {
+	var res UserCollectionBiz
+	err := dao.db.WithContext(ctx).
+		Where("biz = ? AND biz_id = ? AND uid = ?",
+			biz, id, uid).First(&res).Error
+	return res, err
+}
+
+func (dao *GORMInteractiveDAO) GetLikeInfo(ctx context.Context,
+	biz string, id int64, uid int64) (UserLikeBiz, error) {
+	var res UserLikeBiz
+	//多判断个status：是否取消了点赞
+	err := dao.db.WithContext(ctx).
+		Where("biz = ? AND biz_id = ? AND uid = ? AND status = ?",
+			biz, id, uid, 1).
+		First(&res).Error
+	return res, err
 }
 
 func (dao *GORMInteractiveDAO) InsertCollectionBiz(ctx context.Context,
@@ -108,7 +142,22 @@ func NewGORMInteractiveDAO(db *gorm.DB) InteractiveDAO {
 	return &GORMInteractiveDAO{db: db}
 }
 
-func (dao *GORMInteractiveDAO) IncrReadCnt(ctx context.Context, biz string, bizId int64) error {
+func (dao *GORMInteractiveDAO) BatchIncrReadCnt(ctx context.Context,
+	biz []string, bizId []int64) error {
+	return dao.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txDAO := NewGORMInteractiveDAO(tx)
+		for i := 0; i < len(biz); i++ {
+			err := txDAO.IncrReadCnt(ctx, biz[i], bizId[i])
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (dao *GORMInteractiveDAO) IncrReadCnt(ctx context.Context,
+	biz string, bizId int64) error {
 	now := time.Now().UnixMilli()
 	//UpSert
 	return dao.db.WithContext(ctx).Clauses(clause.OnConflict{

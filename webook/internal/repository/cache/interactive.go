@@ -5,6 +5,9 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"mbook/webook/internal/domain"
+	"strconv"
+	"time"
 )
 
 var (
@@ -21,9 +24,41 @@ type InteractiveCache interface {
 	IncrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error
 	DecrLikeCntIfPresent(ctx context.Context, biz string, bizId int64) error
 	IncrCollectCntIfPresent(ctx context.Context, biz string, bizId int64) error
+	Get(ctx context.Context, biz string, id int64) (domain.Interactive, error)
+	Set(ctx context.Context, biz string, id int64, intr domain.Interactive) error
 }
 type InteractiveRedisCache struct {
 	client redis.Cmdable
+}
+
+func (i *InteractiveRedisCache) Get(ctx context.Context,
+	biz string, id int64) (domain.Interactive, error) {
+	key := i.key(biz, id)
+	res, err := i.client.HGetAll(ctx, key).Result()
+	if err != nil {
+		return domain.Interactive{}, err
+	}
+	if len(res) == 0 {
+		return domain.Interactive{}, ErrKeyNotExist
+	}
+	var intr domain.Interactive
+	//可以忽略错误
+	intr.ReadCnt, _ = strconv.ParseInt(res[fieldReadCnt], 10, 64)
+	intr.LikeCnt, _ = strconv.ParseInt(res[fieldLikeCnt], 10, 64)
+	intr.CollectCnt, _ = strconv.ParseInt(res[fieldCollectCnt], 10, 64)
+	return intr, nil
+}
+
+func (i *InteractiveRedisCache) Set(ctx context.Context,
+	biz string, id int64, intr domain.Interactive) error {
+	key := i.key(biz, id)
+	err := i.client.HSet(ctx, key, fieldReadCnt, intr.ReadCnt,
+		fieldLikeCnt, intr.LikeCnt,
+		fieldCollectCnt, intr.CollectCnt).Err()
+	if err != nil {
+		return err
+	}
+	return i.client.Expire(ctx, key, time.Minute*15).Err()
 }
 
 func (i *InteractiveRedisCache) IncrCollectCntIfPresent(ctx context.Context,

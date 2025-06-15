@@ -1,9 +1,9 @@
 package web
 
 import (
-	"context"
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/errgroup"
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/service"
 	"mbook/webook/internal/web/jwt"
@@ -35,7 +35,7 @@ func (h *ArticleHandler) RegisterRoutes(server *gin.Engine) {
 	g.POST("/edit", h.Edit)
 	g.POST("/publish", h.Publish)
 	g.POST("/withdraw", h.Withdraw)
-
+	//创作者接口
 	g.GET("/detail/:id", h.Detail)
 	g.POST("/list", h.List)
 
@@ -242,30 +242,53 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 			logger.Error(err))
 		return
 	}
-	art, err := h.svc.GetPubById(ctx, id)
+
+	var (
+		eg   errgroup.Group
+		art  domain.Article
+		intr domain.Interactive
+	)
+	uc := ctx.MustGet("user").(jwt.UserClaims)
+	eg.Go(func() error {
+		var er error
+		//发表文章的详情
+		art, er = h.svc.GetPubById(ctx, id, uc.Uid)
+		return er
+	})
+
+	eg.Go(func() error {
+		var er error
+		//该文章的三连数、你是否点赞/收藏过
+		intr, er = h.intrSvc.Get(ctx, h.biz, id, uc.Uid)
+		return er
+	})
+	// 等待结果
+	err = eg.Wait()
+
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
-		h.l.Error("查询文章失败",
-			logger.Int64("id", id),
+		h.l.Error("查询文章失败,系统错误",
+			logger.Int64("aid", id),
+			logger.Int64("uid", uc.Uid),
 			logger.Error(err))
 		return
 	}
 
-	go func() {
-		//1. 如果你想摆脱原本主链路的超时控制，你就创建一个新的
-		//2. 如果你不想，你就用 ctx
-		newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		er := h.intrSvc.IncrReadCnt(newCtx, h.biz, art.Id)
-		if er != nil {
-			h.l.Error("更新阅读数失败",
-				logger.Int64("aid", art.Id),
-				logger.Error(err))
-		}
-	}()
+	//go func() {
+	//	//1. 如果你想摆脱原本主链路的超时控制，你就创建一个新的
+	//	//2. 如果你不想，你就用 ctx
+	//	newCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	//	defer cancel()
+	//	er := h.intrSvc.IncrReadCnt(newCtx, h.biz, art.Id)
+	//	if er != nil {
+	//		h.l.Error("更新阅读数失败",
+	//			logger.Int64("aid", art.Id),
+	//			logger.Error(err))
+	//	}
+	//}()
 
 	vo := ArticleVo{
 		Id:    art.Id,
@@ -274,6 +297,11 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		Content:    art.Content,
 		AuthorId:   art.Author.Id,
 		AuthorName: art.Author.Name,
+		ReadCnt:    intr.ReadCnt,
+		CollectCnt: intr.CollectCnt,
+		LikeCnt:    intr.LikeCnt,
+		Liked:      intr.Liked,
+		Collected:  intr.Collected,
 		Status:     art.Status.ToUint8(),
 		Ctime:      art.Ctime.Format(time.DateTime),
 		Utime:      art.Utime.Format(time.DateTime),

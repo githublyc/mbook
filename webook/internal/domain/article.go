@@ -6,10 +6,10 @@ type Article struct {
 	Id      int64
 	Title   string
 	Content string
-	Author
-	Ctime  time.Time
-	Utime  time.Time
-	Status ArticleStatus
+	Author  Author
+	Ctime   time.Time
+	Utime   time.Time
+	Status  ArticleStatus
 }
 
 func (a Article) Abstract() string {

@@ -5,6 +5,7 @@ package startup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"mbook/webook/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -18,6 +19,8 @@ var thirdPartySet = wire.NewSet(
 	//第三方依赖
 	InitRedis, InitDB,
 	InitLogger,
+	InitSaramaClient,
+	InitSyncProducer,
 )
 var userSvcProvider = wire.NewSet(
 	dao.NewUserDAO,
@@ -25,7 +28,14 @@ var userSvcProvider = wire.NewSet(
 	repository.NewCachedUserRepository,
 	service.NewUserService,
 )
-var interactiveSvcSet = wire.NewSet(dao.NewGORMInteractiveDAO,
+var articleSvcProvider = wire.NewSet(
+	dao.NewArticleGORMDAO,
+	cache.NewArticleRedisCache,
+	repository.NewCachedArticleRepository,
+	service.NewArticleService)
+
+var interactiveSvcSet = wire.NewSet(
+	dao.NewGORMInteractiveDAO,
 	cache.NewInteractiveRedisCache,
 	repository.NewCachedInteractiveRepository,
 	service.NewInteractiveService,
@@ -34,19 +44,18 @@ var interactiveSvcSet = wire.NewSet(dao.NewGORMInteractiveDAO,
 func InitWebServer() *gin.Engine {
 	wire.Build(
 		thirdPartySet,
+		userSvcProvider,
+		articleSvcProvider,
 		interactiveSvcSet,
-		dao.NewUserDAO,
-		dao.NewArticleGORMDAO,
-		cache.NewUserCache, cache.NewCodeCache,
-		cache.NewArticleRedisCache,
 
-		repository.NewCachedUserRepository,
+		cache.NewCodeCache,
+
 		repository.NewCodeRepository,
-		repository.NewCachedArticleRepository,
+
+		article.NewSaramaSyncProducer,
 
 		ioc.InitSMSService,
-		service.NewUserService, service.NewCodeService,
-		service.NewArticleService,
+		service.NewCodeService,
 		InitWechatService,
 
 		web.NewUserHandler,
@@ -67,6 +76,7 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 		repository.NewCachedArticleRepository,
 		service.NewArticleService,
 		web.NewArticleHandler,
+		article.NewSaramaSyncProducer,
 	)
 	return &web.ArticleHandler{}
 }
