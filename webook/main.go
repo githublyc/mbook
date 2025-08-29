@@ -2,25 +2,41 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"github.com/fsnotify/fsnotify"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	_ "github.com/spf13/viper/remote"
 	"go.uber.org/zap"
 	"log"
+	"mbook/webook/ioc"
 	"net/http"
+	"time"
 )
 
 func main() {
 	initViper()
+	tpCancel := ioc.InitOTEL()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		tpCancel(ctx)
+	}()
 	app := InitWebServer()
+	initPrometheus()
 	for _, c := range app.consumers {
 		err := c.Start()
 		if err != nil {
 			panic(err)
 		}
 	}
+	app.cron.Start()
+	defer func() {
+		// 等待定时任务退出
+		<-app.cron.Stop().Done()
+	}()
 	server := app.server
 	server.GET("/hello", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "hello，启动成功了！")
@@ -139,4 +155,11 @@ func initLogger() {
 		panic(err)
 	}
 	zap.ReplaceGlobals(logger)
+}
+func initPrometheus() {
+	go func() {
+		// 专门给 prometheus 用的端口
+		http.Handle("/metrics", promhttp.Handler())
+		http.ListenAndServe(":8081", nil)
+	}()
 }

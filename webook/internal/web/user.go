@@ -89,7 +89,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "密码必须包含字母、数字、特殊字符，并且不少于八位")
 		return
 	}
-	err = h.svc.Signup(ctx, domain.User{
+	err = h.svc.Signup(ctx.Request.Context(), domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})

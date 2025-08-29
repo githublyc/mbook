@@ -5,6 +5,7 @@ import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
+	"gorm.io/plugin/opentelemetry/tracing"
 	"mbook/webook/internal/repository/dao"
 	"mbook/webook/pkg/logger"
 )
@@ -32,6 +33,13 @@ func InitDB(l logger.LoggerV1) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
+
+	err = db.Use(tracing.NewPlugin(tracing.WithoutMetrics(),
+		tracing.WithDBSystem("webook")))
+	if err != nil {
+		panic(err)
+	}
+
 	err = dao.InitTables(db)
 	if err != nil {
 		panic(err)

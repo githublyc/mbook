@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"mbook/webook/internal/web"
 	ijwt "mbook/webook/internal/web/jwt"
 	"mbook/webook/internal/web/middleware"
@@ -46,6 +47,7 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			},
 			MaxAge: 12 * time.Hour,
 		}),
+		otelgin.Middleware("webook"),
 		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(
 			redisClient, time.Second, 1000)).Build(),
 		logMiddlewareBuilder.Build(),
