@@ -1,0 +1,52 @@
+package ioc
+
+import (
+	"github.com/spf13/viper"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/plugin/opentelemetry/tracing"
+	dao2 "mbook/webook/interactive/repository/dao"
+	"mbook/webook/pkg/logger"
+)
+
+func InitDB(l logger.LoggerV1) *gorm.DB {
+	type Config struct {
+		DSN string `yaml:"dsn"`
+	}
+	//默认值V2
+
+	var cfg Config = Config{
+		DSN: "root:root@tcp(localhost:3316)/webook",
+	}
+	err := viper.UnmarshalKey("db", &cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := gorm.Open(mysql.Open(cfg.DSN), &gorm.Config{})
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.Use(tracing.NewPlugin(tracing.WithoutMetrics(),
+		tracing.WithDBSystem("webook")))
+	if err != nil {
+		panic(err)
+	}
+
+	err = dao2.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+// 函数衍生类型实现接口
+type gormLoggerFunc func(msg string, fields ...logger.Field)
+
+func (g gormLoggerFunc) Printf(s string, i ...interface{}) {
+	g(s, logger.Field{
+		Key: "args",
+		Val: i,
+	})
+}
