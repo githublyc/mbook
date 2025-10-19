@@ -31,9 +31,10 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 	hdl ijwt.Handler, l logger.LoggerV1) []gin.HandlerFunc {
 	loginJWTMiddlewareBuilder := middleware.NewLoginJWTMiddlewareBuilder(hdl)
 
-	logMiddlewareBuilder := middleware.NewLogMiddlewareBuilder(func(ctx context.Context, al middleware.AccessLog) {
-		l.Debug("", logger.Field{"req", al})
-	}).AllowReqBody().AllowRespBody()
+	logMiddlewareBuilder := middleware.NewLogMiddlewareBuilder(
+		func(ctx context.Context, al middleware.AccessLog) {
+			l.Debug("", logger.Field{"req", al})
+		}).AllowReqBody().AllowRespBody()
 
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{

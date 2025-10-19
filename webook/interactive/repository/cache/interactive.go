@@ -5,7 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/redis/go-redis/v9"
-	"mbook/webook/internal/domain"
+	"mbook/webook/interactive/domain"
 	"strconv"
 	"time"
 )
@@ -42,6 +42,7 @@ func (i *InteractiveRedisCache) Get(ctx context.Context,
 		return domain.Interactive{}, ErrKeyNotExist
 	}
 	var intr domain.Interactive
+	intr.BizId = id
 	//可以忽略错误
 	intr.ReadCnt, _ = strconv.ParseInt(res[fieldReadCnt], 10, 64)
 	intr.LikeCnt, _ = strconv.ParseInt(res[fieldLikeCnt], 10, 64)

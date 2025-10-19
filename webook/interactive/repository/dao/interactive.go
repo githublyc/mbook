@@ -23,11 +23,12 @@ type GORMInteractiveDAO struct {
 	db *gorm.DB
 }
 
-func (dao *GORMInteractiveDAO) GetByIds(ctx context.Context, biz string, ids []int64) ([]Interactive, error) {
+func (dao *GORMInteractiveDAO) GetByIds(ctx context.Context,
+	biz string, ids []int64) ([]Interactive, error) {
 	var res []Interactive
 	err := dao.db.WithContext(ctx).
 		Where("biz = ? AND biz_id IN ?", biz, ids).
-		First(&res).Error
+		Find(&res).Error
 	return res, err
 }
 

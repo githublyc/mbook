@@ -5,7 +5,11 @@ package startup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"mbook/webook/events/article"
+	repository2 "mbook/webook/interactive/repository"
+	cache2 "mbook/webook/interactive/repository/cache"
+	dao2 "mbook/webook/interactive/repository/dao"
+	service2 "mbook/webook/interactive/service"
+	"mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -13,6 +17,13 @@ import (
 	"mbook/webook/internal/web"
 	ijwt "mbook/webook/internal/web/jwt"
 	"mbook/webook/ioc"
+)
+
+var interactiveSvcSet = wire.NewSet(
+	dao2.NewGORMInteractiveDAO,
+	cache2.NewInteractiveRedisCache,
+	repository2.NewCachedInteractiveRepository,
+	service2.NewInteractiveService,
 )
 
 var thirdPartySet = wire.NewSet(
@@ -35,10 +46,10 @@ var articleSvcProvider = wire.NewSet(
 	service.NewArticleService)
 
 var interactiveSvcSet = wire.NewSet(
-	dao.NewGORMInteractiveDAO,
-	cache.NewInteractiveRedisCache,
-	repository.NewCachedInteractiveRepository,
-	service.NewInteractiveService,
+	dao2.NewGORMInteractiveDAO,
+	cache2.NewInteractiveRedisCache,
+	repository2.NewCachedInteractiveRepository,
+	service2.NewInteractiveService,
 )
 
 func InitWebServer() *gin.Engine {
@@ -79,8 +90,4 @@ func InitArticleHandler(dao dao.ArticleDAO) *web.ArticleHandler {
 		article.NewSaramaSyncProducer,
 	)
 	return &web.ArticleHandler{}
-}
-func InitInteractiveService() service.InteractiveService {
-	wire.Build(thirdPartySet, interactiveSvcSet)
-	return service.NewInteractiveService(nil)
 }

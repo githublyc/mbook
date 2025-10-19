@@ -10,3 +10,12 @@ db:
 kafka:
   addr:
     - "localhost:9094"
+etcd:
+  addrs:
+    - "localhost:12379"
+
+grpc:
+  client:
+    intr:
+      addr: "etcd:///service/interactive"
+      threshold: 100

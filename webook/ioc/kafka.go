@@ -3,8 +3,7 @@ package ioc
 import (
 	"github.com/IBM/sarama"
 	"github.com/spf13/viper"
-	"mbook/webook/events"
-	"mbook/webook/events/article"
+	"mbook/webook/internal/events"
 )
 
 // InitSaramaClient client包括addr和sarama的config
@@ -32,8 +31,6 @@ func InitSyncProducer(client sarama.Client) sarama.SyncProducer {
 	}
 	return p
 }
-func InitConsumers(c1 *article.InteractiveReadEventConsumer) []events.Consumer {
-	return []events.Consumer{
-		c1,
-	}
+func InitConsumers() []events.Consumer {
+	return []events.Consumer{}
 }

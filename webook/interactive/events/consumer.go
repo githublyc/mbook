@@ -1,14 +1,20 @@
-package article
+package events
 
 import (
 	"context"
 	"github.com/IBM/sarama"
-	"mbook/webook/internal/repository"
+	"mbook/webook/interactive/repository"
 	"mbook/webook/pkg/logger"
 	"mbook/webook/pkg/samarax"
 	"time"
 )
 
+const TopicReadEvent = "article_read"
+
+type ReadEvent struct {
+	Aid int64
+	Uid int64
+}
 type InteractiveReadEventConsumer struct {
 	repo   repository.InteractiveRepository
 	client sarama.Client

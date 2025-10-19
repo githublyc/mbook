@@ -28,7 +28,6 @@ func (h *Handler[T]) ConsumeClaim(session sarama.ConsumerGroupSession,
 	claim sarama.ConsumerGroupClaim) error {
 	msgs := claim.Messages()
 	for msg := range msgs {
-		//在这里调用业务处理逻辑
 		var t T
 		err := json.Unmarshal(msg.Value, &t)
 		if err != nil {

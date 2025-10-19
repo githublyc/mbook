@@ -4,6 +4,7 @@ import (
 	"github.com/ecodeclub/ekit/slice"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/sync/errgroup"
+	intrv1 "mbook/webook/api/proto/gen/intr/v1"
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/service"
 	"mbook/webook/internal/web/jwt"
@@ -15,13 +16,13 @@ import (
 
 type ArticleHandler struct {
 	svc     service.ArticleService
-	intrSvc service.InteractiveService
+	intrSvc intrv1.InteractiveServiceClient
 	l       logger.LoggerV1
 	biz     string
 }
 
 func NewArticleHandler(l logger.LoggerV1,
-	svc service.ArticleService, intrSvc service.InteractiveService) *ArticleHandler {
+	svc service.ArticleService, intrSvc intrv1.InteractiveServiceClient) *ArticleHandler {
 	return &ArticleHandler{
 		l:       l,
 		svc:     svc,
@@ -246,7 +247,7 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	var (
 		eg   errgroup.Group
 		art  domain.Article
-		intr domain.Interactive
+		intr *intrv1.GetResponse
 	)
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	eg.Go(func() error {
@@ -259,7 +260,11 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 	eg.Go(func() error {
 		var er error
 		//该文章的三连数、你是否点赞/收藏过
-		intr, er = h.intrSvc.Get(ctx, h.biz, id, uc.Uid)
+		intr, er = h.intrSvc.Get(ctx, &intrv1.GetRequest{
+			Biz:   h.biz,
+			BizId: id,
+			Uid:   uc.Uid,
+		})
 		return er
 	})
 	// 等待结果
@@ -297,11 +302,11 @@ func (h *ArticleHandler) PubDetail(ctx *gin.Context) {
 		Content:    art.Content,
 		AuthorId:   art.Author.Id,
 		AuthorName: art.Author.Name,
-		ReadCnt:    intr.ReadCnt,
-		CollectCnt: intr.CollectCnt,
-		LikeCnt:    intr.LikeCnt,
-		Liked:      intr.Liked,
-		Collected:  intr.Collected,
+		ReadCnt:    intr.Intr.ReadCnt,
+		CollectCnt: intr.Intr.CollectCnt,
+		LikeCnt:    intr.Intr.LikeCnt,
+		Liked:      intr.Intr.Liked,
+		Collected:  intr.Intr.Collected,
 		Status:     art.Status.ToUint8(),
 		Ctime:      art.Ctime.Format(time.DateTime),
 		Utime:      art.Utime.Format(time.DateTime),
@@ -322,9 +327,17 @@ func (h *ArticleHandler) Like(ctx *gin.Context) {
 	uc := ctx.MustGet("user").(jwt.UserClaims)
 	var err error
 	if req.Like {
-		err = h.intrSvc.Like(ctx, h.biz, req.Id, uc.Uid)
+		_, err = h.intrSvc.Like(ctx, &intrv1.LikeRequest{
+			Biz:   h.biz,
+			BizId: req.Id,
+			Uid:   uc.Uid,
+		})
 	} else {
-		err = h.intrSvc.CancelLike(ctx, h.biz, req.Id, uc.Uid)
+		_, err = h.intrSvc.CancelLike(ctx, &intrv1.CancelLikeRequest{
+			Biz:   h.biz,
+			BizId: req.Id,
+			Uid:   uc.Uid,
+		})
 	}
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
@@ -352,7 +365,9 @@ func (h *ArticleHandler) Collect(ctx *gin.Context) {
 		return
 	}
 	uc := ctx.MustGet("user").(jwt.UserClaims)
-	err := h.intrSvc.Collect(ctx, h.biz, req.Id, req.Cid, uc.Uid)
+	_, err := h.intrSvc.Collect(ctx, &intrv1.CollectRequest{
+		Biz: h.biz, BizId: req.Id, Cid: req.Cid, Uid: uc.Uid,
+	})
 	if err != nil {
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5, Msg: "系统错误",

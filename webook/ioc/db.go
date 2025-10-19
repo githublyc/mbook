@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	glogger "gorm.io/gorm/logger"
 	"gorm.io/plugin/opentelemetry/tracing"
+	dao2 "mbook/webook/interactive/repository/dao"
 	"mbook/webook/internal/repository/dao"
 	"mbook/webook/pkg/logger"
 )
@@ -41,6 +42,10 @@ func InitDB(l logger.LoggerV1) *gorm.DB {
 	}
 
 	err = dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	err = dao2.InitTables(db)
 	if err != nil {
 		panic(err)
 	}

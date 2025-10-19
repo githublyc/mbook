@@ -38,6 +38,5 @@ func (m *LoginMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 				fmt.Println(err)
 			}
 		}
-
 	}
 }

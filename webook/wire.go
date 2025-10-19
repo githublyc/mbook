@@ -4,7 +4,11 @@ package main
 
 import (
 	"github.com/google/wire"
-	"mbook/webook/events/article"
+	repository2 "mbook/webook/interactive/repository"
+	cache2 "mbook/webook/interactive/repository/cache"
+	dao2 "mbook/webook/interactive/repository/dao"
+	service2 "mbook/webook/interactive/service"
+	article2 "mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -14,13 +18,11 @@ import (
 	"mbook/webook/ioc"
 )
 
-var interactiveSvcSet = wire.NewSet(
-	dao.NewGORMInteractiveDAO,
-	cache.NewInteractiveRedisCache,
-	repository.NewCachedInteractiveRepository,
-	service.NewInteractiveService,
+var interactiveSvcSet = wire.NewSet(dao2.NewGORMInteractiveDAO,
+	cache2.NewInteractiveRedisCache,
+	repository2.NewCachedInteractiveRepository,
+	service2.NewInteractiveService,
 )
-
 var rankingSvcSet = wire.NewSet(
 	cache.NewRankingRedisCache,
 	repository.NewCachedOnlyRankingRepository,
@@ -32,17 +34,20 @@ func InitWebServer() *App {
 		//第三方依赖
 		ioc.InitRedis, ioc.InitDB,
 		ioc.InitLogger,
+		ioc.InitEtcd,
 		ioc.InitSaramaClient,
 		ioc.InitSyncProducer,
 		ioc.InitRlockClient,
 
-		interactiveSvcSet,
+		//interactiveSvcSet,
+		//ioc.InitIntrClient,
+		ioc.InitIntrClientV1,
 		rankingSvcSet,
 		ioc.InitJobs,
 		ioc.InitRankingJob,
 
-		article.NewSaramaSyncProducer,
-		article.NewInteractiveReadEventConsumer,
+		article2.NewSaramaSyncProducer,
+		//events.NewInteractiveReadEventConsumer,
 		ioc.InitConsumers,
 
 		dao.NewUserDAO,

@@ -3,9 +3,9 @@ package repository
 import (
 	"context"
 	"github.com/ecodeclub/ekit/slice"
-	"mbook/webook/internal/domain"
-	"mbook/webook/internal/repository/cache"
-	"mbook/webook/internal/repository/dao"
+	"mbook/webook/interactive/domain"
+	"mbook/webook/interactive/repository/cache"
+	dao "mbook/webook/interactive/repository/dao"
 	"mbook/webook/pkg/logger"
 )
 

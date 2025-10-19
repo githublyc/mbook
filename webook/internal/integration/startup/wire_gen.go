@@ -9,7 +9,11 @@ package startup
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"mbook/webook/events/article"
+	repository2 "mbook/webook/interactive/repository"
+	cache2 "mbook/webook/interactive/repository/cache"
+	dao2 "mbook/webook/interactive/repository/dao"
+	service2 "mbook/webook/interactive/service"
+	"mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -43,10 +47,10 @@ func InitWebServer() *gin.Engine {
 	syncProducer := InitSyncProducer(client)
 	producer := article.NewSaramaSyncProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer)
-	interactiveDAO := dao.NewGORMInteractiveDAO(db)
-	interactiveCache := cache.NewInteractiveRedisCache(cmdable)
-	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
-	interactiveService := service.NewInteractiveService(interactiveRepository)
+	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
+	interactiveCache := cache2.NewInteractiveRedisCache(cmdable)
+	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
+	interactiveService := service2.NewInteractiveService(interactiveRepository)
 	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveService)
 	wechatService := InitWechatService(loggerV1)
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(handler, wechatService, userService)
@@ -54,7 +58,7 @@ func InitWebServer() *gin.Engine {
 	return engine
 }
 
-func InitArticleHandler(dao2 dao.ArticleDAO) *web.ArticleHandler {
+func InitArticleHandler(dao3 dao.ArticleDAO) *web.ArticleHandler {
 	loggerV1 := InitLogger()
 	cmdable := InitRedis()
 	articleCache := cache.NewArticleRedisCache(cmdable)
@@ -62,26 +66,26 @@ func InitArticleHandler(dao2 dao.ArticleDAO) *web.ArticleHandler {
 	userDAO := dao.NewUserDAO(db)
 	userCache := cache.NewUserCache(cmdable)
 	userRepository := repository.NewCachedUserRepository(userDAO, userCache)
-	articleRepository := repository.NewCachedArticleRepository(dao2, articleCache, userRepository)
+	articleRepository := repository.NewCachedArticleRepository(dao3, articleCache, userRepository)
 	client := InitSaramaClient()
 	syncProducer := InitSyncProducer(client)
 	producer := article.NewSaramaSyncProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer)
-	interactiveDAO := dao.NewGORMInteractiveDAO(db)
-	interactiveCache := cache.NewInteractiveRedisCache(cmdable)
-	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
-	interactiveService := service.NewInteractiveService(interactiveRepository)
+	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
+	interactiveCache := cache2.NewInteractiveRedisCache(cmdable)
+	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
+	interactiveService := service2.NewInteractiveService(interactiveRepository)
 	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveService)
 	return articleHandler
 }
 
-func InitInteractiveService() service.InteractiveService {
+func InitInteractiveService() service2.InteractiveService {
 	db := InitDB()
-	interactiveDAO := dao.NewGORMInteractiveDAO(db)
+	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
 	cmdable := InitRedis()
-	interactiveCache := cache.NewInteractiveRedisCache(cmdable)
-	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
-	interactiveService := service.NewInteractiveService(interactiveRepository)
+	interactiveCache := cache2.NewInteractiveRedisCache(cmdable)
+	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
+	interactiveService := service2.NewInteractiveService(interactiveRepository)
 	return interactiveService
 }
 
@@ -99,4 +103,4 @@ var userSvcProvider = wire.NewSet(dao.NewUserDAO, cache.NewUserCache, repository
 
 var articleSvcProvider = wire.NewSet(dao.NewArticleGORMDAO, cache.NewArticleRedisCache, repository.NewCachedArticleRepository, service.NewArticleService)
 
-var interactiveSvcSet = wire.NewSet(dao.NewGORMInteractiveDAO, cache.NewInteractiveRedisCache, repository.NewCachedInteractiveRepository, service.NewInteractiveService)
+var interactiveSvcSet = wire.NewSet(dao2.NewGORMInteractiveDAO, cache2.NewInteractiveRedisCache, repository2.NewCachedInteractiveRepository, service2.NewInteractiveService)

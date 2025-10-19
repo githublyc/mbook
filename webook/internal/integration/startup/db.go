@@ -3,6 +3,7 @@ package startup
 import (
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	dao2 "mbook/webook/interactive/repository/dao"
 	"mbook/webook/internal/repository/dao"
 )
 
@@ -12,6 +13,10 @@ func InitDB() *gorm.DB {
 		panic(err)
 	}
 	err = dao.InitTables(db)
+	if err != nil {
+		panic(err)
+	}
+	err = dao2.InitTables(db)
 	if err != nil {
 		panic(err)
 	}

@@ -8,7 +8,12 @@ package main
 
 import (
 	"github.com/google/wire"
-	"mbook/webook/events/article"
+	"mbook/webook/interactive/events"
+	repository2 "mbook/webook/interactive/repository"
+	cache2 "mbook/webook/interactive/repository/cache"
+	dao2 "mbook/webook/interactive/repository/dao"
+	service2 "mbook/webook/interactive/service"
+	"mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -46,17 +51,18 @@ func InitWebServer() *App {
 	syncProducer := ioc.InitSyncProducer(client)
 	producer := article.NewSaramaSyncProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer)
-	interactiveDAO := dao.NewGORMInteractiveDAO(db)
-	interactiveCache := cache.NewInteractiveRedisCache(cmdable)
-	interactiveRepository := repository.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
-	interactiveService := service.NewInteractiveService(interactiveRepository)
-	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveService)
+	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
+	interactiveCache := cache2.NewInteractiveRedisCache(cmdable)
+	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
+	interactiveService := service2.NewInteractiveService(interactiveRepository)
+	interactiveServiceClient := ioc.InitIntrClient(interactiveService)
+	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveServiceClient)
 	wechatService := ioc.InitWechatService(loggerV1)
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(handler, wechatService, userService)
 	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler)
-	interactiveReadEventConsumer := article.NewInteractiveReadEventConsumer(interactiveRepository, client, loggerV1)
+	interactiveReadEventConsumer := events.NewInteractiveReadEventConsumer(interactiveRepository, client, loggerV1)
 	v2 := ioc.InitConsumers(interactiveReadEventConsumer)
-	rankingService := service.NewBatchRankingService(interactiveService, articleService)
+	rankingService := service.NewBatchRankingService(interactiveServiceClient, articleService)
 	rlockClient := ioc.InitRlockClient(cmdable)
 	rankingJob := ioc.InitRankingJob(rankingService, loggerV1, rlockClient)
 	cron := ioc.InitJobs(loggerV1, rankingJob)
@@ -70,6 +76,6 @@ func InitWebServer() *App {
 
 // wire.go:
 
-var interactiveSvcSet = wire.NewSet(dao.NewGORMInteractiveDAO, cache.NewInteractiveRedisCache, repository.NewCachedInteractiveRepository, service.NewInteractiveService)
+var interactiveSvcSet = wire.NewSet(dao2.NewGORMInteractiveDAO, cache2.NewInteractiveRedisCache, repository2.NewCachedInteractiveRepository, service2.NewInteractiveService)
 
 var rankingSvcSet = wire.NewSet(cache.NewRankingRedisCache, repository.NewCachedOnlyRankingRepository, service.NewBatchRankingService)

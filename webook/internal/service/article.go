@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 	"errors"
-	"mbook/webook/events/article"
 	"mbook/webook/internal/domain"
+	"mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/pkg/logger"
 	"time"
