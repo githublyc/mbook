@@ -24,7 +24,7 @@ func main() {
 		defer cancel()
 		tpCancel(ctx)
 	}()
-	app := InitWebServer()
+	app := InitApp()
 	initPrometheus()
 	for _, c := range app.consumers {
 		err := c.Start()

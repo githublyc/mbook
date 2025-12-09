@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/repository/cache"
@@ -16,6 +17,7 @@ var (
 	ErrUserNotFound = dao.ErrRecordNotFound
 )
 
+//go:generate mockgen -source=./user.go -package=repomocks -destination=./mocks/user.mock.go UserRepository
 type UserRepository interface {
 	Create(ctx context.Context, u domain.User) error
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
@@ -99,6 +101,11 @@ func (repo *CachedUserRepository) FindById(ctx context.Context, uid int64) (doma
 	// 只要 err 为 nil，就返回
 	if err == nil {
 		return du, nil
+	}
+
+	// 检测服务治理标记位
+	if ctx.Value("downgrade") == "true" {
+		return du, errors.New("触发降级，不再查询数据库")
 	}
 
 	// err 不为 nil，就要查询数据库

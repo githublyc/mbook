@@ -26,7 +26,7 @@ type LocalCodeCache struct {
 	expiration time.Duration
 }
 
-func NewLocalCodeCache(c *lru.Cache, expiration time.Duration) *LocalCodeCache {
+func NewLocalCodeCache(c *lru.Cache, expiration time.Duration) CodeCache {
 	return &LocalCodeCache{
 		cache:      c,
 		expiration: expiration,

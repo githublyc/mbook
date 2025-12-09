@@ -17,3 +17,34 @@ type ArticleVo struct {
 	Liked      bool  `json:"liked"`
 	Collected  bool  `json:"collected"`
 }
+
+type PublishReq struct {
+	Id      int64
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+type ArticleEditReq struct {
+	Id      int64
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+type ArticleWithdrawReq struct {
+	Id      int64
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+type ArticleLikeReq struct {
+	Id int64 `json:"id"`
+	// true 是点赞，false 是不点赞
+	Like bool `json:"like"`
+}
+
+type ArticleCollectReq struct {
+	Id  int64 `json:"id"`
+	Cid int64 `json:"cid"`
+}
+
+type ArticleRewardReq struct {
+	Id  int64 `json:"id"`
+	Amt int64 `json:"amt"`
+}

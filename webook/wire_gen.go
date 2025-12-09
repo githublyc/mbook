@@ -8,7 +8,6 @@ package main
 
 import (
 	"github.com/google/wire"
-	"mbook/webook/interactive/events"
 	repository2 "mbook/webook/interactive/repository"
 	cache2 "mbook/webook/interactive/repository/cache"
 	dao2 "mbook/webook/interactive/repository/dao"
@@ -29,7 +28,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitWebServer() *App {
+func InitApp() *App {
 	cmdable := ioc.InitRedis()
 	handler := jwt.NewRedisJWTHandler(cmdable)
 	loggerV1 := ioc.InitLogger()
@@ -39,7 +38,7 @@ func InitWebServer() *App {
 	userCache := cache.NewUserCache(cmdable)
 	userRepository := repository.NewCachedUserRepository(userDAO, userCache)
 	userService := service.NewUserService(userRepository)
-	codeCache := cache.NewCodeCache(cmdable)
+	codeCache := cache.NewRedisCodeCache(cmdable)
 	codeRepository := repository.NewCodeRepository(codeCache)
 	smsService := ioc.InitSMSService()
 	codeService := service.NewCodeService(codeRepository, smsService)
@@ -51,18 +50,17 @@ func InitWebServer() *App {
 	syncProducer := ioc.InitSyncProducer(client)
 	producer := article.NewSaramaSyncProducer(syncProducer)
 	articleService := service.NewArticleService(articleRepository, producer)
-	interactiveDAO := dao2.NewGORMInteractiveDAO(db)
-	interactiveCache := cache2.NewInteractiveRedisCache(cmdable)
-	interactiveRepository := repository2.NewCachedInteractiveRepository(interactiveDAO, interactiveCache)
-	interactiveService := service2.NewInteractiveService(interactiveRepository)
-	interactiveServiceClient := ioc.InitIntrClient(interactiveService)
-	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveServiceClient)
+	clientv3Client := ioc.InitEtcd()
+	interactiveServiceClient := ioc.InitIntrClientV1(clientv3Client)
+	rewardServiceClient := ioc.InitReward()
+	articleHandler := web.NewArticleHandler(loggerV1, articleService, interactiveServiceClient, rewardServiceClient)
 	wechatService := ioc.InitWechatService(loggerV1)
 	oAuth2WechatHandler := web.NewOAuth2WechatHandler(handler, wechatService, userService)
 	engine := ioc.InitWebServer(v, userHandler, articleHandler, oAuth2WechatHandler)
-	interactiveReadEventConsumer := events.NewInteractiveReadEventConsumer(interactiveRepository, client, loggerV1)
-	v2 := ioc.InitConsumers(interactiveReadEventConsumer)
-	rankingService := service.NewBatchRankingService(interactiveServiceClient, articleService)
+	v2 := ioc.InitConsumers()
+	rankingCache := cache.NewRankingRedisCache(cmdable)
+	rankingRepository := repository.NewCachedOnlyRankingRepository(rankingCache)
+	rankingService := service.NewBatchRankingService(interactiveServiceClient, articleService, rankingRepository)
 	rlockClient := ioc.InitRlockClient(cmdable)
 	rankingJob := ioc.InitRankingJob(rankingService, loggerV1, rlockClient)
 	cron := ioc.InitJobs(loggerV1, rankingJob)

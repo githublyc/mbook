@@ -8,7 +8,7 @@ import (
 	cache2 "mbook/webook/interactive/repository/cache"
 	dao2 "mbook/webook/interactive/repository/dao"
 	service2 "mbook/webook/interactive/service"
-	article2 "mbook/webook/internal/events/article"
+	"mbook/webook/internal/events/article"
 	"mbook/webook/internal/repository"
 	"mbook/webook/internal/repository/cache"
 	"mbook/webook/internal/repository/dao"
@@ -18,7 +18,8 @@ import (
 	"mbook/webook/ioc"
 )
 
-var interactiveSvcSet = wire.NewSet(dao2.NewGORMInteractiveDAO,
+var interactiveSvcSet = wire.NewSet(
+	dao2.NewGORMInteractiveDAO,
 	cache2.NewInteractiveRedisCache,
 	repository2.NewCachedInteractiveRepository,
 	service2.NewInteractiveService,
@@ -29,9 +30,9 @@ var rankingSvcSet = wire.NewSet(
 	service.NewBatchRankingService,
 )
 
-func InitWebServer() *App {
+func InitApp() *App {
 	wire.Build(
-		//第三方依赖
+		// 第三方依赖
 		ioc.InitRedis, ioc.InitDB,
 		ioc.InitLogger,
 		ioc.InitEtcd,
@@ -42,29 +43,33 @@ func InitWebServer() *App {
 		//interactiveSvcSet,
 		//ioc.InitIntrClient,
 		ioc.InitIntrClientV1,
+		ioc.InitReward,
 		rankingSvcSet,
 		ioc.InitJobs,
 		ioc.InitRankingJob,
 
-		article2.NewSaramaSyncProducer,
+		article.NewSaramaSyncProducer,
 		//events.NewInteractiveReadEventConsumer,
 		ioc.InitConsumers,
 
 		dao.NewUserDAO,
 		dao.NewArticleGORMDAO,
 
-		cache.NewUserCache, cache.NewCodeCache,
+		cache.NewUserCache, cache.NewRedisCodeCache,
 		cache.NewArticleRedisCache,
 
+		// repository 部分
 		repository.NewCachedUserRepository,
 		repository.NewCodeRepository,
 		repository.NewCachedArticleRepository,
 
+		// Service 部分
 		ioc.InitSMSService,
 		ioc.InitWechatService,
 		service.NewUserService, service.NewCodeService,
 		service.NewArticleService,
 
+		// handler 部分
 		web.NewUserHandler,
 		web.NewArticleHandler,
 		web.NewOAuth2WechatHandler,

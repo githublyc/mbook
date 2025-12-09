@@ -17,6 +17,7 @@ var (
 	ErrCodeVerifyTooMany = errors.New("验证太频繁")
 )
 
+//go:generate mockgen -source=./code.go -package=cachemocks -destination=./mocks/code.mock.go CodeCache
 type CodeCache interface {
 	Set(ctx context.Context, biz, phone, code string) error
 	Verify(ctx context.Context, biz, phone, code string) (bool, error)
@@ -25,7 +26,7 @@ type RedisCodeCache struct {
 	cmd redis.Cmdable
 }
 
-func NewCodeCache(cmd redis.Cmdable) CodeCache {
+func NewRedisCodeCache(cmd redis.Cmdable) CodeCache {
 	return &RedisCodeCache{cmd: cmd}
 }
 func (c *RedisCodeCache) Set(ctx context.Context, biz, phone, code string) error {

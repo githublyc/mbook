@@ -5,6 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
+//go:generate mockgen -source=./article_reader.go -package=daomocks -destination=./mocks/article_reader.mock.go ArticleReaderDAO
 type ArticleReaderDAO interface {
 	Upsert(ctx context.Context, art Article) error
 	UpsertV2(ctx context.Context, art PublishedArticle) error

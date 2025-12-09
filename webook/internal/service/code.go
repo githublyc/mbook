@@ -10,6 +10,7 @@ import (
 
 var ErrCodeSendTooMany = repository.ErrCodeSendTooMany
 
+//go:generate mockgen -source=./code.go -package=svcmocks -destination=./mocks/code.mock.go CodeService
 type CodeService interface {
 	Send(ctx context.Context, biz, phone string) error
 	Verify(ctx context.Context, biz, phone, inputCode string) (bool, error)
@@ -32,7 +33,6 @@ func (svc *codeService) Send(ctx context.Context, biz, phone string) error {
 	}
 	const codeTplId = "1877556"
 	return svc.sms.Send(ctx, codeTplId, []string{code}, phone)
-
 }
 func (svc *codeService) Verify(ctx context.Context, biz, phone, inputCode string) (bool, error) {
 	ok, err := svc.repo.Verify(ctx, biz, phone, inputCode)

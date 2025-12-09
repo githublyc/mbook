@@ -10,6 +10,7 @@ import (
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/service"
 	ijwt "mbook/webook/internal/web/jwt"
+	"mbook/webook/pkg/ginx"
 	"net/http"
 	"time"
 )
@@ -49,11 +50,11 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login", h.LoginJWT)
 	ug.POST("/logout", h.LogoutJWT)
 	ug.POST("/edit", h.Edit)
-	ug.GET("/profile", h.Profile)
+	ug.GET("/profile", ginx.WrapClaims(h.Profile))
 	ug.GET("/refresh_token", h.RefreshToken)
 	// 手机验证码登录相关功能
 	ug.POST("/login_sms/code/send", h.SendSMSLoginCode)
-	ug.POST("/login_sms", h.LoginSMS)
+	ug.POST("/login_sms", ginx.WrapBody(h.LoginSMS))
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -175,17 +176,15 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 
 }
 
-func (h *UserHandler) Profile(ctx *gin.Context) {
-	uc, ok := ctx.MustGet("user").(ijwt.UserClaims)
-	if !ok {
-		//ctx.String(http.StatusOK, "系统错误")
-		ctx.AbortWithStatus(http.StatusUnauthorized)
-		return
-	}
+func (h *UserHandler) Profile(ctx *gin.Context,
+	uc ijwt.UserClaims) (ginx.Result, error) {
+
 	u, err := h.svc.FindById(ctx, uc.Uid)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统异常")
-		return
+		return ginx.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
 	}
 	type User struct {
 		Nickname string `json:"nickname"`
@@ -193,12 +192,14 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 		AboutMe  string `json:"aboutMe"`
 		Birthday string `json:"birthday"`
 	}
-	ctx.JSON(http.StatusOK, User{
-		Nickname: u.Nickname,
-		Email:    u.Email,
-		AboutMe:  u.AboutMe,
-		Birthday: u.Birthday.Format(time.DateOnly),
-	})
+	return ginx.Result{
+		Data: User{
+			Nickname: u.Nickname,
+			Email:    u.Email,
+			AboutMe:  u.AboutMe,
+			Birthday: u.Birthday.Format(time.DateOnly),
+		},
+	}, nil
 }
 
 func (h *UserHandler) LoginJWT(ctx *gin.Context) {
@@ -236,7 +237,7 @@ func (h *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 	}
 	// 你这边可以校验 Req
 	if req.Phone == "" {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 4,
 			Msg:  "请输入手机号码",
 		})
@@ -245,17 +246,17 @@ func (h *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 	err := h.codeSvc.Send(ctx, bizLogin, req.Phone)
 	switch err {
 	case nil:
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg: "发送成功",
 		})
 	case service.ErrCodeSendTooMany:
 		zap.L().Warn("短信发送太频繁")
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 4,
 			Msg:  "短信发送太频繁，请稍后再试",
 		})
 	default:
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
@@ -264,47 +265,39 @@ func (h *UserHandler) SendSMSLoginCode(ctx *gin.Context) {
 	}
 }
 
-func (h *UserHandler) LoginSMS(ctx *gin.Context) {
-	type Req struct {
-		Phone string `json:"phone"`
-		Code  string `json:"code"`
-	}
-	var req Req
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
+func (h *UserHandler) LoginSMS(ctx *gin.Context,
+	req LoginSMSReq) (ginx.Result, error) {
 	ok, err := h.codeSvc.Verify(ctx, bizLogin, req.Phone, req.Code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		return ginx.Result{
 			Code: 5,
 			Msg:  "系统异常",
-		})
-		zap.L().Error("手机验证码验证失败", zap.Error(err))
-		return
+			//Msg: err.Error(),
+		}, err
 	}
 	if !ok {
-		ctx.JSON(http.StatusOK, Result{
+		return ginx.Result{
 			Code: 4,
 			Msg:  "验证码不对，请重新输入",
-		})
-		return
+		}, nil
 	}
 	u, err := h.svc.FindOrCreate(ctx, req.Phone)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		return ginx.Result{
 			Code: 5,
-			Msg:  "系统异常",
-		})
-		return
+			Msg:  "系统错误",
+		}, err
 	}
 	err = h.SetLoginToken(ctx, u.Id)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
+		return ginx.Result{
+			Code: 5,
+			Msg:  "系统错误",
+		}, err
 	}
-	ctx.JSON(http.StatusOK, Result{
+	return ginx.Result{
 		Msg: "登录成功",
-	})
+	}, nil
 }
 
 func (h *UserHandler) RefreshToken(ctx *gin.Context) {
@@ -335,7 +328,7 @@ func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "OK",
 	})
 }
@@ -343,9 +336,9 @@ func (h *UserHandler) RefreshToken(ctx *gin.Context) {
 func (h *UserHandler) LogoutJWT(ctx *gin.Context) {
 	err := h.ClearToken(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		ctx.JSON(http.StatusOK, ginx.Result{Code: 5, Msg: "系统错误"})
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{Msg: "退出登录成功"})
+	ctx.JSON(http.StatusOK, ginx.Result{Msg: "退出登录成功"})
 
 }

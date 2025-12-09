@@ -103,7 +103,7 @@ func TestRedisCodeCache_Set(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 			cmd := tc.mock(ctrl)
-			c := NewCodeCache(cmd)
+			c := NewRedisCodeCache(cmd)
 			err := c.Set(tc.ctx, tc.biz, tc.phone, tc.code)
 			assert.Equal(t, tc.wantErr, err)
 		})

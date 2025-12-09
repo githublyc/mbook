@@ -59,7 +59,7 @@ func InitWebServer() *gin.Engine {
 		articleSvcProvider,
 		interactiveSvcSet,
 
-		cache.NewCodeCache,
+		cache.NewRedisCodeCache,
 
 		repository.NewCodeRepository,
 

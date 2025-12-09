@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// ArticleRepository 接口层面上完全没有体现要不要缓存，如何缓存
+
+//go:generate mockgen -source=./article.go -package=repomocks -destination=./mocks/article.mock.go ArticleRepository
 type ArticleRepository interface {
 	Create(ctx context.Context, art domain.Article) (int64, error)
 	Update(ctx context.Context, art domain.Article) error
@@ -33,6 +36,9 @@ type CachedArticleRepository struct {
 	db *gorm.DB
 }
 
+func (c *CachedArticleRepository) Cache() cache.ArticleCache {
+	return c.cache
+}
 func (c *CachedArticleRepository) ListPub(ctx context.Context, start time.Time, offset int, limit int) ([]domain.Article, error) {
 	arts, err := c.dao.ListPub(ctx, start, offset, limit)
 	if err != nil {
@@ -40,7 +46,7 @@ func (c *CachedArticleRepository) ListPub(ctx context.Context, start time.Time, 
 	}
 	return slice.Map[dao.PublishedArticle, domain.Article](arts,
 		func(idx int, src dao.PublishedArticle) domain.Article {
-			return c.toDomain(dao.Article(src))
+			return c.ToDomain(dao.Article(src))
 		}), nil
 }
 
@@ -53,7 +59,7 @@ func (c *CachedArticleRepository) GetPubById(ctx context.Context, id int64) (dom
 	if err != nil {
 		return domain.Article{}, err
 	}
-	res = c.toDomain(dao.Article(art))
+	res = c.ToDomain(dao.Article(art))
 	author, err := c.userRepo.FindById(ctx, art.AuthorId)
 	if err != nil {
 		return domain.Article{}, err
@@ -82,12 +88,12 @@ func (c *CachedArticleRepository) GetById(ctx context.Context, id int64) (domain
 		return domain.Article{}, err
 	}
 	go func() {
-		er := c.cache.Set(ctx, c.toDomain(art))
+		er := c.cache.Set(ctx, c.ToDomain(art))
 		if er != nil {
 			//记录日志
 		}
 	}()
-	return c.toDomain(art), nil
+	return c.ToDomain(art), nil
 }
 
 func (c *CachedArticleRepository) GetByAuthor(ctx context.Context, uid int64, offset int, limit int) ([]domain.Article, error) {
@@ -108,7 +114,7 @@ func (c *CachedArticleRepository) GetByAuthor(ctx context.Context, uid int64, of
 	}
 	res := slice.Map[dao.Article, domain.Article](arts,
 		func(idx int, src dao.Article) domain.Article {
-			return c.toDomain(src)
+			return c.ToDomain(src)
 		})
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -150,6 +156,7 @@ func NewCachedArticleRepositoryV2(authorDAO dao.ArticleAuthorDAO,
 	}
 }
 
+// Sync DAO 层同步数据
 func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) (int64, error) {
 	id, err := c.dao.Sync(ctx, c.toEntity(art))
 	if err == nil {
@@ -177,7 +184,8 @@ func (c *CachedArticleRepository) Sync(ctx context.Context, art domain.Article) 
 	return id, err
 }
 
-func (c *CachedArticleRepository) Update(ctx context.Context, art domain.Article) error {
+func (c *CachedArticleRepository) Update(ctx context.Context,
+	art domain.Article) error {
 	err := c.dao.UpdateById(ctx, c.toEntity(art))
 	if err == nil {
 		er := c.cache.DelFirstPage(ctx, art.Author.Id)
@@ -208,7 +216,10 @@ func (c *CachedArticleRepository) Create(ctx context.Context, art domain.Article
 	return id, err
 }
 
-func (c *CachedArticleRepository) SyncV1(ctx context.Context, art domain.Article) (int64, error) {
+// SyncV1 SyncV2 Repository 层同步数据
+// SyncV1 非事务实现
+func (c *CachedArticleRepository) SyncV1(ctx context.Context,
+	art domain.Article) (int64, error) {
 	artn := c.toEntity(art)
 	var (
 		id  = art.Id
@@ -226,7 +237,14 @@ func (c *CachedArticleRepository) SyncV1(ctx context.Context, art domain.Article
 	err = c.readerDAO.Upsert(ctx, artn)
 	return id, err
 }
-func (c *CachedArticleRepository) SyncV2(ctx context.Context, art domain.Article) (int64, error) {
+
+// SyncV2 事务实现
+// 这种写法，逼迫 Repository 引入了 gorm.DB 的依赖，
+// 也就是相当于 Repository 强依赖于 DAO 依赖的东西。
+// • 没有坚持面向接口原则。
+// • 跨层依赖，导致后续如果切换 gorm.DB 到别的实现，Repository 也会受到影响。
+func (c *CachedArticleRepository) SyncV2(ctx context.Context,
+	art domain.Article) (int64, error) {
 	tx := c.db.WithContext(ctx).Begin()
 	if tx.Error != nil {
 		return 0, tx.Error
@@ -266,7 +284,7 @@ func (c *CachedArticleRepository) toEntity(art domain.Article) dao.Article {
 		Status:   art.Status.ToUint8(),
 	}
 }
-func (c *CachedArticleRepository) toDomain(art dao.Article) domain.Article {
+func (c *CachedArticleRepository) ToDomain(art dao.Article) domain.Article {
 	return domain.Article{
 		Id:      art.Id,
 		Title:   art.Title,

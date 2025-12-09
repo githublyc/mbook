@@ -5,7 +5,7 @@ import (
 	"github.com/IBM/sarama"
 	"mbook/webook/interactive/repository"
 	"mbook/webook/pkg/logger"
-	"mbook/webook/pkg/samarax"
+	"mbook/webook/pkg/saramax"
 	"time"
 )
 
@@ -35,7 +35,7 @@ func (i *InteractiveReadEventConsumer) StartV1() error {
 	go func() {
 		er := cg.Consume(context.Background(),
 			[]string{TopicReadEvent},
-			samarax.NewBatchHandler[ReadEvent](i.l, i.BatchConsume))
+			saramax.NewBatchHandler[ReadEvent](i.l, i.BatchConsume))
 		if er != nil {
 			i.l.Error("退出消费", logger.Error(er))
 		}
@@ -50,9 +50,11 @@ func (i *InteractiveReadEventConsumer) Start() error {
 	}
 
 	go func() {
+		// Consume是是一个阻塞调用：一旦开始消费，它会一直在里面跑（拉消息、分发到 handler、处理 rebalance、心跳等）
+		// 直到出错或 context 被取消。
 		er := cg.Consume(context.Background(),
 			[]string{TopicReadEvent},
-			samarax.NewHandler[ReadEvent](i.l, i.Consume))
+			saramax.NewHandler[ReadEvent](i.l, i.Consume))
 		if er != nil {
 			i.l.Error("退出消费", logger.Error(er))
 		}

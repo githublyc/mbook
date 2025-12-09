@@ -6,7 +6,7 @@ import (
 	"mbook/webook/internal/domain"
 	"mbook/webook/internal/repository"
 	"mbook/webook/pkg/logger"
-	"mbook/webook/pkg/samarax"
+	"mbook/webook/pkg/saramax"
 	"time"
 )
 
@@ -25,7 +25,7 @@ func (i *HistoryRecordConsumer) Start() error {
 	go func() {
 		er := cg.Consume(context.Background(),
 			[]string{TopicReadEvent},
-			samarax.NewHandler[ReadEvent](i.l, i.Consume))
+			saramax.NewHandler[ReadEvent](i.l, i.Consume))
 		if er != nil {
 			i.l.Error("退出消费", logger.Error(er))
 		}

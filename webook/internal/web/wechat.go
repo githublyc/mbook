@@ -8,6 +8,7 @@ import (
 	"mbook/webook/internal/service"
 	"mbook/webook/internal/service/oauth2/wechat"
 	ijwt "mbook/webook/internal/web/jwt"
+	"mbook/webook/pkg/ginx"
 	"net/http"
 )
 
@@ -40,7 +41,7 @@ func (o *OAuth2WechatHandler) Auth2URL(ctx *gin.Context) {
 	state := uuid.New()
 	val, err := o.svc.AuthURL(ctx, state)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "构造跳转URL失败",
 			Code: 5,
 		})
@@ -48,12 +49,12 @@ func (o *OAuth2WechatHandler) Auth2URL(ctx *gin.Context) {
 	}
 	err = o.setStateCookie(ctx, state)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Data: val,
 	})
 }
@@ -102,7 +103,7 @@ type StateClaims struct {
 func (o *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	err := o.verifyState(ctx)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "非法请求",
 			Code: 4,
 		})
@@ -112,7 +113,7 @@ func (o *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	//state := ctx.Query("state")
 	wechatInfo, err := o.svc.VerifyCode(ctx, code)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "授权码有误",
 			Code: 4,
 		})
@@ -120,7 +121,7 @@ func (o *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 	}
 	u, err := o.userSvc.FindOrCreateByWechat(ctx, wechatInfo)
 	if err != nil {
-		ctx.JSON(http.StatusOK, Result{
+		ctx.JSON(http.StatusOK, ginx.Result{
 			Msg:  "系统错误",
 			Code: 5,
 		})
@@ -131,7 +132,7 @@ func (o *OAuth2WechatHandler) Callback(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
+	ctx.JSON(http.StatusOK, ginx.Result{
 		Msg: "OK",
 	})
 	return

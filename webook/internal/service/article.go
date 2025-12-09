@@ -79,7 +79,8 @@ func NewArticleServiceV1(
 	}
 }
 
-func (a *articleService) Publish(ctx context.Context, art domain.Article) (int64, error) {
+func (a *articleService) Publish(ctx context.Context,
+	art domain.Article) (int64, error) {
 	art.Status = domain.ArticleStatusPublished
 	return a.repo.Sync(ctx, art)
 }
@@ -89,7 +90,8 @@ func NewArticleService(repo repository.ArticleRepository,
 	return &articleService{repo: repo, producer: producer}
 }
 
-func (a *articleService) Save(ctx context.Context, art domain.Article) (int64, error) {
+func (a *articleService) Save(ctx context.Context,
+	art domain.Article) (int64, error) {
 	art.Status = domain.ArticleStatusUnpublished
 	if art.Id > 0 {
 		err := a.repo.Update(ctx, art)
