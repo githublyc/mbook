@@ -86,11 +86,13 @@ func (dao *GORMTagDAO) GetTagsByUid(ctx context.Context, uid int64) ([]Tag, erro
 	return res, err
 }
 
-func (dao *GORMTagDAO) GetTagsByBiz(ctx context.Context, uid int64, biz string, bizId int64) ([]Tag, error) {
+func (dao *GORMTagDAO) GetTagsByBiz(ctx context.Context,
+	uid int64, biz string, bizId int64) ([]Tag, error) {
 	// 这边使用 JOIN 查询，如果你不想使用 JOIN 查询，
 	// 你就在 repository 里面分成两次查询
 	//var bizTags []TagBiz
-	//err := dao.db.WithContext(ctx).Where("uid = ? AND biz = ? AND biz_id = ?", uid, biz, bizId).Find(&bizTags).Error
+	//err := dao.db.WithContext(ctx).
+	//Where("uid = ? AND biz = ? AND biz_id = ?", uid, biz, bizId).Find(&bizTags).Error
 	//if err != nil {
 	//	return nil, err
 	//}

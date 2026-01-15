@@ -28,6 +28,11 @@ services:
     image: openzipkin/zipkin-slim:2.24
     ports:
       - '9411:9411'
+  grafana:
+    image: grafana/grafana-enterprise:10.2.0
+    ports:
+      - 3000:3000
+      -
   redis:
     image: "bitnami/redis:latest"
     restart: always

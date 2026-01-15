@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 	"log"
 	"mbook/webook/internal/domain"
+	"mbook/webook/internal/errs"
 	"mbook/webook/internal/service"
 	ijwt "mbook/webook/internal/web/jwt"
 	"mbook/webook/pkg/ginx"
@@ -45,7 +46,7 @@ func NewUserHandler(hdl ijwt.Handler,
 func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	//分组路由
 	ug := server.Group("/users")
-	ug.POST("/signup", h.SignUp)
+	ug.POST("/signup", ginx.WrapBody(h.SignUp))
 	//ug.POST("/login", h.Login)
 	ug.POST("/login", h.LoginJWT)
 	ug.POST("/logout", h.LogoutJWT)
@@ -57,52 +58,63 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_sms", ginx.WrapBody(h.LoginSMS))
 }
 
-func (h *UserHandler) SignUp(ctx *gin.Context) {
-	type SignupReq struct {
-		Email           string `json:"email"`
-		Password        string `json:"password"`
-		ConfirmPassword string `json:"confirmPassword"`
-	}
-	var req SignupReq
-	if err := ctx.Bind(&req); err != nil {
-		return
-	}
+func (h *UserHandler) SignUp(ctx *gin.Context, req SignUpReq) (ginx.Result, error) {
 	isEmail, err := h.emailRegexp.MatchString(req.Email)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
-		return
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
 	}
 	if !isEmail {
-		ctx.String(http.StatusOK, "非法邮箱格式")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "非法邮箱格式",
+		}, nil
 	}
+
 	if req.Password != req.ConfirmPassword {
-		ctx.String(http.StatusOK, "两次输入密码不对")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "两次输入的密码不相等",
+		}, nil
 	}
 
 	isPassword, err := h.passwordRegexp.MatchString(req.Password)
 	if err != nil {
-		ctx.String(http.StatusOK, "系统错误")
-		return
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
 	}
 	if !isPassword {
-		ctx.String(http.StatusOK, "密码必须包含字母、数字、特殊字符，并且不少于八位")
-		return
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "密码必须包含字母、数字、特殊字符",
+		}, nil
 	}
+
 	err = h.svc.Signup(ctx.Request.Context(), domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
 	switch err {
 	case nil:
-		ctx.String(http.StatusOK, "注册成功")
+		return ginx.Result{
+			Msg: "OK",
+		}, nil
 	case service.ErrDuplicateEmail:
-		ctx.String(http.StatusOK, "邮箱冲突")
+		return ginx.Result{
+			Code: errs.UserDuplicateEmail,
+			Msg:  "邮箱冲突",
+		}, nil
 	default:
-		ctx.String(http.StatusOK, "系统错误")
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
 	}
-
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {

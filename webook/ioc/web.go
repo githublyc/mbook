@@ -4,11 +4,14 @@ import (
 	"context"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	prometheus2 "github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 	otelgin "go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"mbook/webook/internal/web"
 	ijwt "mbook/webook/internal/web/jwt"
 	"mbook/webook/internal/web/middleware"
+	"mbook/webook/pkg/ginx"
+	"mbook/webook/pkg/ginx/middleware/prometheus"
 	"mbook/webook/pkg/ginx/middleware/ratelimit"
 	"mbook/webook/pkg/limiter"
 	"mbook/webook/pkg/logger"
@@ -36,6 +39,19 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			l.Debug("", logger.Field{"req", al})
 		}).AllowReqBody().AllowRespBody()
 
+	pb := &prometheus.Builder{
+		Namespace: "lyc",
+		Subsystem: "webook",
+		Name:      "gin_http",
+		Help:      "统计 GIN 的HTTP接口数据",
+	}
+	ginx.InitCounter(prometheus2.CounterOpts{
+		Namespace: "geektime_daming",
+		Subsystem: "webook",
+		Name:      "biz_code",
+		Help:      "统计业务错误码",
+	})
+
 	return []gin.HandlerFunc{
 		cors.New(cors.Config{
 			AllowCredentials: true,
@@ -48,6 +64,8 @@ func InitGinMiddlewares(redisClient redis.Cmdable,
 			},
 			MaxAge: 12 * time.Hour,
 		}),
+		pb.BuildResponseTime(),
+		pb.BuildActiveRequest(),
 		otelgin.Middleware("webook"),
 		ratelimit.NewBuilder(limiter.NewRedisSlidingWindowLimiter(
 			redisClient, time.Second, 1000)).Build(),

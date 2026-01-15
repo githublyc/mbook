@@ -41,7 +41,8 @@ func (r *RankingJob) Run() error {
 	lock := r.lock
 	if lock == nil {
 		// 抢分布式锁
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
+		ctx, cancel := context.WithTimeout(context.Background(),
+			time.Second*4)
 		defer cancel()
 		lock, err := r.client.Lock(ctx, r.key, r.timeout,
 			&rlock.FixIntervalRetry{
